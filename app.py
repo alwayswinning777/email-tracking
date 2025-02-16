@@ -7,7 +7,7 @@ app = Flask(__name__)
 # Set up logging
 logging.basicConfig(filename="tracking.log", level=logging.INFO)
 
-GOOGLE_MAPS_API_KEY = "AIzaSyDqHblgE1eMNpsna71tEzPr4dadi6PjowE"
+GOOGLE_MAPS_API_KEY = "AIzaSyAXct7fYes2RtC-Zz8BRknXZNiDQiLdE0E"
 
 def get_address_from_coordinates(latitude, longitude):
     """Fetch address from latitude and longitude using Google Maps API."""
@@ -23,35 +23,31 @@ def get_address_from_coordinates(latitude, longitude):
     except requests.exceptions.RequestException as e:
         return f"API request failed: {e}"
 
+GOOGLE_GEOLOCATION_API_KEY = "AIzaSyAXct7fYes2RtC-Zz8BRknXZNiDQiLdE0E"
+
 def get_location():
-    """Fetch real client IP and use IP geolocation API."""
+    """Fetch accurate location using Google Geolocation API."""
     try:
-        # Get the real client IP from headers (Render uses reverse proxies)
-        ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-
-        if ip == "127.0.0.1" or ip.startswith("192.") or ip.startswith("10.") or ip.startswith("172."):
-            return {
-                "error": "Local network IP detected. Cannot determine public location."
-            }
-
-        # Call IP Geolocation API
-        response = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)
+        # Make a request to Google Geolocation API
+        url = f"https://www.googleapis.com/geolocation/v1/geolocate?key={GOOGLE_GEOLOCATION_API_KEY}"
+        response = requests.post(url, json={})
         data = response.json()
 
-        location_info = {
-            "ip": ip,
-            "city": data.get("city", "Unknown"),
-            "region": data.get("region", "Unknown"),
-            "country": data.get("country", "Unknown"),
-            "latitude": data.get("loc", "0,0").split(',')[0],
-            "longitude": data.get("loc", "0,0").split(',')[1],
-            "isp": data.get("org", "Unknown"),
-        }
-        return location_info
+        if "location" in data:
+            latitude = data["location"]["lat"]
+            longitude = data["location"]["lng"]
+            full_address = get_address_from_coordinates(latitude, longitude)
+
+            return {
+                "latitude": latitude,
+                "longitude": longitude,
+                "accuracy": data.get("accuracy", "Unknown"),
+                "address": full_address
+            }
+        else:
+            return {"error": "Could not retrieve location data"}
     except requests.exceptions.RequestException as e:
         return {"error": f"API request failed: {e}"}
-    except Exception as e:
-        return {"error": f"Unexpected error: {e}"}
 
 @app.route('/')
 def home():
@@ -60,33 +56,13 @@ def home():
 @app.route('/track')
 def track():
     try:
-        # Get the real client IP (Render uses a reverse proxy)
-        ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+        location = get_location()
 
-        if ip == "127.0.0.1" or ip.startswith("192.") or ip.startswith("10.") or ip.startswith("172."):
-            location = {"error": "Local network IP detected. Cannot determine public location."}
-        else:
-            response = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)
-            data = response.json()
-
-            latitude, longitude = data.get("loc", "0,0").split(',')
-            full_address = get_address_from_coordinates(latitude, longitude)
-
-            location = {
-                "ip": ip,
-                "city": data.get("city", "Unknown"),
-                "region": data.get("region", "Unknown"),
-                "country": data.get("country", "Unknown"),
-                "latitude": latitude,
-                "longitude": longitude,
-                "isp": data.get("org", "Unknown"),
-                "address": full_address
-            }
-
-        # Log the visit details
-        log_entry = f"IP: {location['ip']}, City: {location['city']}, Region: {location['region']}, Country: {location['country']}, Lat: {location['latitude']}, Lon: {location['longitude']}, ISP: {location['isp']}, Address: {location['address']}"
+        # Log visitor details
+        log_entry = f"Lat: {location['latitude']}, Lon: {location['longitude']}, Address: {location['address']}, Accuracy: {location['accuracy']} meters"
         logging.info(log_entry)
 
+        # Return the tracking pixel
         return send_file("pixel.png", mimetype="image/png")
 
     except requests.exceptions.RequestException as e:

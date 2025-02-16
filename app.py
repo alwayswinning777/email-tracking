@@ -8,6 +8,7 @@ app = Flask(__name__)
 # Set up logging
 logging.basicConfig(filename="tracking.log", level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# 🔹 Replace with your actual Google API Keys
 GOOGLE_GEOLOCATION_API_KEY = "AIzaSyCaf-BPC6XNFbM7_MFJMILrcUprTg7OT7U"
 GOOGLE_MAPS_API_KEY = "AIzaSyCaf-BPC6XNFbM7_MFJMILrcUprTg7OT7U"
 
@@ -28,11 +29,10 @@ def get_address_from_coordinates(latitude, longitude):
         return "Error fetching address"
 
 def get_location():
-    """Fetch accurate location using Google Geolocation API with better data."""
+    """Fetch accurate location using Google Geolocation API with correct Flask processing."""
     try:
-        # 🔹 Improved payload with more reliable Wi-Fi and device-based location
         payload = {
-            "considerIp": True,  # Use IP-based location as a fallback
+            "considerIp": True,
             "wifiAccessPoints": [
                 {"macAddress": "00:25:9c:cf:1c:ac", "signalStrength": random.randint(-80, -40), "signalToNoiseRatio": random.randint(30, 80)},
                 {"macAddress": "00:14:bf:3b:2f:2b", "signalStrength": random.randint(-80, -40), "signalToNoiseRatio": random.randint(30, 80)}
@@ -44,28 +44,34 @@ def get_location():
 
         url = f"https://www.googleapis.com/geolocation/v1/geolocate?key={GOOGLE_GEOLOCATION_API_KEY}"
         response = requests.post(url, json=payload)
-        data = response.json()
 
-        logging.info(f"Google API Response: {data}")  # Logs API response for debugging
+        if response.status_code != 200:
+            logging.error(f"Google API Error: {response.text}")
+            return jsonify({"error": f"Google API returned status {response.status_code}"})
+
+        data = response.json()
 
         if "location" in data:
             latitude = data["location"]["lat"]
             longitude = data["location"]["lng"]
             accuracy = data.get("accuracy", "Unknown")
-            full_address = get_address_from_coordinates(latitude, longitude)
 
-            return {
+            logging.info(f"Location found: Lat={latitude}, Lon={longitude}, Accuracy={accuracy}m")
+
+            # ✅ Return proper JSON response
+            return jsonify({
                 "latitude": latitude,
                 "longitude": longitude,
-                "accuracy": accuracy,
-                "address": full_address
-            }
+                "accuracy": accuracy
+            })
+
         else:
-            logging.error(f"Google Geolocation API Error: {data}")
-            return {"error": "Could not retrieve location data"}
+            logging.error(f"Google API Unexpected Response: {data}")
+            return jsonify({"error": "Google API returned an invalid response"})
+
     except requests.exceptions.RequestException as e:
-        logging.error(f"Google API request failed: {e}")
-        return {"error": f"API request failed: {e}"}
+        logging.error(f"API request failed: {e}")
+        return jsonify({"error": f"API request failed: {e}"})
 
 @app.route('/')
 def home():
@@ -77,7 +83,7 @@ def track():
         location = get_location()
 
         # Log visitor details
-        log_entry = f"Lat: {location.get('latitude', 'Unknown')}, Lon: {location.get('longitude', 'Unknown')}, Address: {location.get('address', 'Unknown')}, Accuracy: {location.get('accuracy', 'Unknown')} meters"
+        log_entry = f"Lat: {location.json.get('latitude', 'Unknown')}, Lon: {location.json.get('longitude', 'Unknown')}, Accuracy: {location.json.get('accuracy', 'Unknown')} meters"
         logging.info(log_entry)
 
         # Return the tracking pixel
@@ -98,8 +104,7 @@ def view_tracked():
 
 @app.route('/get-location')
 def get_client_location():
-    location = get_location()
-    return jsonify(location)
+    return get_location()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

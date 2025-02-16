@@ -7,23 +7,28 @@ app = Flask(__name__)
 # Set up logging
 logging.basicConfig(filename="tracking.log", level=logging.INFO)
 
-def get_location(ip):
-    """Fetch location data using an IP geolocation API and handle errors properly."""
+def get_location():
+    """Fetch real client IP and use IP geolocation API."""
     try:
-        response = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)  # Add timeout
+        # Get the real client IP from headers (Render uses reverse proxies)
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+
+        if ip == "127.0.0.1" or ip.startswith("192.") or ip.startswith("10.") or ip.startswith("172."):
+            return {
+                "error": "Local network IP detected. Cannot determine public location."
+            }
+
+        # Call IP Geolocation API
+        response = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)
         data = response.json()
-        
-        # Handle missing 'loc' key
-        loc = data.get("loc", "0,0").split(',')
-        latitude, longitude = loc[0], loc[1]
 
         location_info = {
             "ip": ip,
             "city": data.get("city", "Unknown"),
             "region": data.get("region", "Unknown"),
             "country": data.get("country", "Unknown"),
-            "latitude": latitude,
-            "longitude": longitude,
+            "latitude": data.get("loc", "0,0").split(',')[0],
+            "longitude": data.get("loc", "0,0").split(',')[1],
             "isp": data.get("org", "Unknown"),
         }
         return location_info

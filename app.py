@@ -80,8 +80,7 @@ def view_tracked():
 
 @app.route('/get-location')
 def get_client_location():
-    ip = request.remote_addr
-    location = get_location(ip)
+    location = get_location()  # ✅ Call get_location() without arguments
     return jsonify(location)
 
 if __name__ == "__main__":

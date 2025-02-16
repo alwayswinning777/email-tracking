@@ -43,14 +43,39 @@ def home():
 
 @app.route('/track')
 def track():
-    ip = request.remote_addr
-    location = get_location(ip)
-    
-    # Log the visitor details
-    log_entry = f"IP: {ip}, City: {location['city']}, Region: {location['region']}, Country: {location['country']}, Lat: {location['latitude']}, Lon: {location['longitude']}, ISP: {location['isp']}"
-    logging.info(log_entry)
-    
-    return send_file("pixel.png", mimetype="image/png")
+    try:
+        # Get the real client IP (Render uses a reverse proxy)
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+
+        if ip == "127.0.0.1" or ip.startswith("192.") or ip.startswith("10.") or ip.startswith("172."):
+            location = {"error": "Local network IP detected. Cannot determine public location."}
+        else:
+            response = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)
+            data = response.json()
+
+            location = {
+                "ip": ip,
+                "city": data.get("city", "Unknown"),
+                "region": data.get("region", "Unknown"),
+                "country": data.get("country", "Unknown"),
+                "latitude": data.get("loc", "0,0").split(',')[0],
+                "longitude": data.get("loc", "0,0").split(',')[1],
+                "isp": data.get("org", "Unknown"),
+            }
+
+        # Log the visit details
+        log_entry = f"IP: {location['ip']}, City: {location['city']}, Region: {location['region']}, Country: {location['country']}, Lat: {location['latitude']}, Lon: {location['longitude']}, ISP: {location['isp']}"
+        logging.info(log_entry)
+
+        # Return the tracking pixel
+        return send_file("pixel.png", mimetype="image/png")
+
+    except requests.exceptions.RequestException as e:
+        logging.error(f"API request failed: {e}")
+        return "Error: Unable to fetch geolocation data", 500
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        return "Error: Internal Server Issue", 500
 
 @app.route('/view-tracked')
 def view_tracked():

@@ -25,20 +25,14 @@ def get_address_from_coordinates(latitude, longitude):
 
 import random
 
-GOOGLE_GEOLOCATION_API_KEY = "AIzaSyCaf-BPC6XNFbM7_MFJMILrcUprTg7OT7U"
-
 def get_location():
     """Fetch accurate location using Google Geolocation API with better data."""
     try:
-        # Send a more detailed request to Google for better accuracy
         payload = {
-            "considerIp": True,  # Allow IP-based lookup
+            "considerIp": True,  # Use IP-based location as a fallback
             "wifiAccessPoints": [
                 {"macAddress": "00:25:9c:cf:1c:ac", "signalStrength": random.randint(-80, -40), "signalToNoiseRatio": random.randint(30, 80)},
                 {"macAddress": "00:14:bf:3b:2f:2b", "signalStrength": random.randint(-80, -40), "signalToNoiseRatio": random.randint(30, 80)}
-            ],
-            "cellTowers": [
-                {"cellId": 42, "locationAreaCode": 415, "mobileCountryCode": 310, "mobileNetworkCode": 410, "signalStrength": random.randint(-80, -40)}
             ]
         }
 

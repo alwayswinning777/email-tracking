@@ -28,20 +28,25 @@ GOOGLE_GEOLOCATION_API_KEY = "AIzaSyAXct7fYes2RtC-Zz8BRknXZNiDQiLdE0E"
 def get_location():
     """Fetch accurate location using Google Geolocation API."""
     try:
-        # Make a request to Google Geolocation API
+        # Provide additional data like Wi-Fi and cell tower information
+        payload = {
+            "considerIp": True,  # Use IP-based location as a fallback
+            "wifiAccessPoints": []  # This can be populated dynamically if possible
+        }
         url = f"https://www.googleapis.com/geolocation/v1/geolocate?key={GOOGLE_GEOLOCATION_API_KEY}"
-        response = requests.post(url, json={})
+        response = requests.post(url, json=payload)
         data = response.json()
 
         if "location" in data:
             latitude = data["location"]["lat"]
             longitude = data["location"]["lng"]
+            accuracy = data.get("accuracy", "Unknown")
             full_address = get_address_from_coordinates(latitude, longitude)
 
             return {
                 "latitude": latitude,
                 "longitude": longitude,
-                "accuracy": data.get("accuracy", "Unknown"),
+                "accuracy": accuracy,
                 "address": full_address
             }
         else:

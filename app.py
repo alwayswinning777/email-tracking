@@ -8,23 +8,29 @@ app = Flask(__name__)
 logging.basicConfig(filename="tracking.log", level=logging.INFO)
 
 def get_location(ip):
-    """Fetch location data using an IP geolocation API."""
+    """Fetch location data using an IP geolocation API and handle errors properly."""
     try:
-        response = requests.get(f"https://ipinfo.io/{ip}/json")  # Change API if needed
+        response = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)  # Add timeout
         data = response.json()
         
+        # Handle missing 'loc' key
+        loc = data.get("loc", "0,0").split(',')
+        latitude, longitude = loc[0], loc[1]
+
         location_info = {
             "ip": ip,
             "city": data.get("city", "Unknown"),
             "region": data.get("region", "Unknown"),
             "country": data.get("country", "Unknown"),
-            "latitude": data.get("loc", "Unknown").split(',')[0],
-            "longitude": data.get("loc", "Unknown").split(',')[1],
+            "latitude": latitude,
+            "longitude": longitude,
             "isp": data.get("org", "Unknown"),
         }
         return location_info
+    except requests.exceptions.RequestException as e:
+        return {"error": f"API request failed: {e}"}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"Unexpected error: {e}"}
 
 @app.route('/')
 def home():

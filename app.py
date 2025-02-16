@@ -7,6 +7,22 @@ app = Flask(__name__)
 # Set up logging
 logging.basicConfig(filename="tracking.log", level=logging.INFO)
 
+GOOGLE_MAPS_API_KEY = "AIzaSyDqHblgE1eMNpsna71tEzPr4dadi6PjowE"
+
+def get_address_from_coordinates(latitude, longitude):
+    """Fetch address from latitude and longitude using Google Maps API."""
+    try:
+        url = f"https://maps.googleapis.com/maps/api/geocode/json?latlng={latitude},{longitude}&key={GOOGLE_MAPS_API_KEY}"
+        response = requests.get(url)
+        data = response.json()
+        
+        if data["status"] == "OK":
+            return data["results"][0]["formatted_address"]
+        else:
+            return "Address not found"
+    except requests.exceptions.RequestException as e:
+        return f"API request failed: {e}"
+
 def get_location():
     """Fetch real client IP and use IP geolocation API."""
     try:
@@ -53,21 +69,24 @@ def track():
             response = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)
             data = response.json()
 
+            latitude, longitude = data.get("loc", "0,0").split(',')
+            full_address = get_address_from_coordinates(latitude, longitude)
+
             location = {
                 "ip": ip,
                 "city": data.get("city", "Unknown"),
                 "region": data.get("region", "Unknown"),
                 "country": data.get("country", "Unknown"),
-                "latitude": data.get("loc", "0,0").split(',')[0],
-                "longitude": data.get("loc", "0,0").split(',')[1],
+                "latitude": latitude,
+                "longitude": longitude,
                 "isp": data.get("org", "Unknown"),
+                "address": full_address
             }
 
         # Log the visit details
-        log_entry = f"IP: {location['ip']}, City: {location['city']}, Region: {location['region']}, Country: {location['country']}, Lat: {location['latitude']}, Lon: {location['longitude']}, ISP: {location['isp']}"
+        log_entry = f"IP: {location['ip']}, City: {location['city']}, Region: {location['region']}, Country: {location['country']}, Lat: {location['latitude']}, Lon: {location['longitude']}, ISP: {location['isp']}, Address: {location['address']}"
         logging.info(log_entry)
 
-        # Return the tracking pixel
         return send_file("pixel.png", mimetype="image/png")
 
     except requests.exceptions.RequestException as e:
